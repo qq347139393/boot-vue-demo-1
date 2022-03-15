@@ -46,13 +46,13 @@ const router =  new VueRouter({
 				},
 			]
 		},
-		{
-			path: '/404',
-			component: () => import('@/views/404'),
-			hidden: true
-		},
+		// {
+		// 	path: '/404',
+		// 	component: () => import('@/views/404'),
+		// 	hidden: true
+		// },
 		// 404 page must be placed at the end !!!
-		{ path: '*', redirect: '/404', hidden: true
+		{ path: '*', redirect: '/login', hidden: true
 			// children: [
 			//   {
 			//     path: 'https://panjiachen.github.io/vue-element-admin-site/#/',
@@ -85,7 +85,8 @@ router.beforeEach((to,from,next)=>{
 		console.log("name:",name)
 		const userInfo = {name:name,jwtToken:jwtToken}
 		//用户登录
-		checkToken(userInfo).then(data=>{
+		checkToken(userInfo).then(res=>{
+			let data=res.data;
 			console.log(data)
 			if(data.code==='000000'){//检验正确
 				console.log("已鉴证")
@@ -96,8 +97,8 @@ router.beforeEach((to,from,next)=>{
 					path: '/login'
 				})
 			}
-		},error => {
-			alert(error.message)
+		},res => {
+			alert(res.data.message)
 			next({//强制跳转回登录页
 				path: '/login'
 			})

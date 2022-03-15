@@ -38,7 +38,8 @@ exports.cssLoaders = function (options) {
     if (options.extract) {
       return ExtractTextPlugin.extract({
         use: loaders,
-        fallback: 'vue-style-loader'
+        fallback: 'vue-style-loader',
+        publicPath: '../../' //为了配合config\index.js中设置的打包文件路径而设置的,可以实现在linux服务器上读取静态资源的效果
       })
     } else {
       return ['vue-style-loader'].concat(loaders)

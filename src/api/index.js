@@ -11,7 +11,7 @@ import { getToken } from '@/utils/token'
 //底下的代码也是创建axios实例
 let requests = axios.create({
   //基础路径
-  baseURL: "/bootVueDemo",
+  // baseURL: "/bootVueDemo",
   //请求不能超过15S
   timeout: 15000,
 });
@@ -41,7 +41,7 @@ requests.interceptors.response.use(
     //进度条结束
     nprogress.done();//响应返回后结束进度条
     //相应成功做的事情
-    return res.data;//返回的就是response中的data
+    return res;
   },
   (err) => {
     alert("服务器响应数据失败");

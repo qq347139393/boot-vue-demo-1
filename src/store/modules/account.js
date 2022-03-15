@@ -6,6 +6,7 @@ import { setToken, getToken,removeToken} from "@/utils/token";
 import { login} from "@/api/account";
 import qs from "qs";
 
+
 export default {
   namespaced:true,
   actions:{//相当于service
@@ -19,7 +20,8 @@ export default {
       let result;
       // debugger;
       console.log("loginForm",loginForm)
-      await login(loginForm).then(data=>{
+      await login(loginForm).then(res=>{
+        let data=res.data;
         console.log('请求成功了')
         console.log(data)
         if(data.code==='000000'){//请求成功
@@ -35,9 +37,9 @@ export default {
           alert(data.msg)
           result=false
         }
-      },error => {
+      },res => {
         //请求后更新List的数据
-        alert(error.message)
+        alert(res.data.message)
         result=false
       });
       return result;

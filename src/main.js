@@ -1,12 +1,8 @@
 //引入Vue
 import Vue from 'vue'
-//引入App组件
-import App from './App.vue'
 
 //引入VueRouter
 import VueRouter from 'vue-router'
-//引入路由器
-import router from './router'
 
 //引入store
 import store from './store'
@@ -14,6 +10,11 @@ import store from './store'
 import Element from 'element-ui'
 import locale from 'element-ui/lib/locale/lang/en' //elementUI的国际化功能(英文)
 import 'element-ui/lib/theme-chalk/index.css'
+
+//引入App组件
+import App from './App.vue'
+//引入路由器
+import router from './router'
 
 //关闭Vue的生产提示
 Vue.config.productionTip = false

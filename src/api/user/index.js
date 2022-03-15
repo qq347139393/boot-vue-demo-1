@@ -54,6 +54,18 @@ export function selectsByIds(params) {//在发送ajax请求前进行的特定配
     })
 }
 
+//用户excel导出
+export function excelExport(data) {//在发送ajax请求前进行的特定配置
+    // console.log(1111111)
+    return requests({
+        // url: '/vue-admin-template/test/list', // 假数据
+        url: '/user/excelExport',
+        method: 'post',
+        data, // *这里注意:如果是分开的请求参数,要用params..因为这个值是配置项的属性名,对应的是req的分开的参数(这里触发了es6的同名省略规则)
+        responseType: 'arraybuffer' //返回文件流的请求要设置这个项
+    })
+}
+
 
 
 

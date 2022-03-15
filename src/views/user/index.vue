@@ -15,6 +15,8 @@
       <el-form-item>
         <el-button type="primary" icon="el-icon-search" @click="onSubmit">查询</el-button>
         <el-button type="warning" icon="el-icon-circle-plus-outline" @click="showEditDialog()">新增</el-button>
+        <el-button type="success" icon="el-icon-upload2" @click="handleImport()">导入</el-button>
+        <el-button type="info" icon="el-icon-download" @click="handleExport()">导出</el-button>
       </el-form-item>
 
     </el-form>
@@ -81,6 +83,62 @@
       </div>
     </el-dialog>
 
+    <!-- 用户导入对话框 -->
+    <el-dialog :title="upload.title" :visible.sync="upload.open" width="400px" append-to-body>
+      <el-upload
+          ref="upload"
+          :limit="1"
+          accept=".xlsx"
+          :headers="upload.headers"
+          :action="upload.url"
+          :name="upload.excelFile"
+          :disabled="upload.isUploading"
+          :on-progress="handleFileUploadProgress"
+          :on-success="handleFileSuccess"
+          :auto-upload="false"
+          drag
+      >
+        <i class="el-icon-upload"></i>
+        <div class="el-upload__text">将文件拖到此处，或<em>点击上传</em></div>
+        <div class="el-upload__tip text-center" slot="tip">
+<!--          <div class="el-upload__tip" slot="tip">-->
+<!--            <el-checkbox v-model="upload.updateSupport" /> 是否更新已经存在的用户数据-->
+<!--          </div>-->
+          <span>仅允许导入xlsx格式文件。</span>
+<!--          <el-link type="primary" :underline="false" style="font-size:12px;vertical-align: baseline;" @click="importTemplate">下载模板</el-link>-->
+        </div>
+      </el-upload>
+      <div slot="footer" class="dialog-footer">
+        <el-button type="primary" @click="submitFileForm">确 定</el-button>
+        <el-button @click="upload.open = false">取 消</el-button>
+      </div>
+    </el-dialog>
+
+    <!-- 导入错误的提示信息的组件 -->
+    <el-dialog title="导入校验错误原因"
+               :visible.sync="dialogTableVisible"
+               width="100%">
+      <el-table
+          :data="excelErrorTableData"
+          style="width: 100%;margin-bottom: 20px;"
+          row-key="id"
+          border
+          default-expand-all
+          :tree-props="{children: 'children', hasChildren: 'hasChildren'}">
+        <el-table-column
+            prop="errorRow"
+            label="错误记录:错误字段"
+            sortable
+            width="180">
+        </el-table-column>
+        <el-table-column
+            prop="errorMsgs"
+            label="错误信息"
+            sortable>
+        </el-table-column>
+      </el-table>
+    </el-dialog>
+
   </div>
 </template>
 <style type="text/css" scoped>
@@ -97,12 +155,20 @@
 }
 </style>
 <script type="text/javascript">
-import {selectsByPage, updatesByIds,inserts,deletesByIds,selectsByIds} from '@/api/user/index'
+import {selectsByPage, updatesByIds,inserts,deletesByIds,selectsByIds,excelExport} from '@/api/user/index'
+import { getToken } from '@/utils/token'
+import {nanoid} from 'nanoid'
 
 export default {
   data() {
     return {
       tableData: [],
+      excelErrorTableData:[{
+        id: null,
+        errorRow: '',
+        errorMsgs: '',
+        children: []
+      }],
       formInline: {
         name: null,
         gender: null,
@@ -118,6 +184,7 @@ export default {
         {key:"",value: null}
       ],
       dialogFormVisible: false,
+      dialogTableVisible:false,
       formLabelWidth: '120px',
       form: {
         id:null,
@@ -128,7 +195,23 @@ export default {
         describ:''
       },
       loading2: false,
-      multipleSelection: []
+      multipleSelection: [],
+      // 用户导入参数
+      upload: {
+        // 是否显示弹出层（用户导入）
+        open: false,
+        // 弹出层标题（用户导入）
+        title: "",
+        // 是否禁用上传
+        isUploading: false,
+        // 是否更新已经存在的用户数据
+        // updateSupport: 0,
+        excelFile:'excelFile',
+        // // 设置上传的请求头部
+        headers: { jwtToken:getToken()},
+        // 上传的地址
+        url: "/user/excelImport"
+      },
     }
   },
   computed: {
@@ -147,14 +230,15 @@ export default {
         name: this.formInline.name==""?null:this.formInline.name,
         gender: this.formInline.gender
       };
-      selectsByPage(data).then(function(result){
-        console.log("@user.result",result)
+      selectsByPage(data).then(function(res){
+        console.log("@user.result",res.data)
+        let result=res.data;
         this.tableData = result.data.records;
         this.total = result.data.total;
         this.loading2 = false;
-      }.bind(this)).catch(function (error) {
+      }.bind(this)).catch(function (res) {
         this.loading2 = false;
-        console.log(error);
+        console.log(res.data);
       }.bind(this));
     },
     //查询
@@ -193,7 +277,8 @@ export default {
         var data = this.tableData[row];
         this.form.id = data.id;
         //其他的要及时去后端查询出最新的字段值
-        await selectsByIds({ids: data.id}).then(data => {
+        await selectsByIds({ids: data.id}).then(res => {
+          let data=res.data;
           console.log('请求成功了')
           console.log(data)
           if (data.code === '000000') {//请求成功
@@ -220,7 +305,8 @@ export default {
             this.loadData();
             return;
           }
-        }, error => {
+        }, res => {
+          let error=res.data
           //请求后更新List的数据
           alert(error.message)
           //清空修改框中的数据
@@ -263,7 +349,8 @@ export default {
       userArr.push(this.form)
       if(this.form.id==null){//新增
         //调用新增接口来新增当前记录
-        await inserts(userArr).then(data => {
+        await inserts(userArr).then(res => {
+          let data=res.data;
           console.log('请求成功了')
           console.log(data)
           if (data.code === '000000') {//请求成功
@@ -284,13 +371,14 @@ export default {
           } else {
             alert(data.msg)
           }
-        }, error => {
+        }, res => {
           //请求后更新List的数据
-          alert(error.message)
+          alert(res.data.message)
         });
       }else{//修改
         //调用修改接口来修改当前记录的字段值
-        await updatesByIds(userArr).then(data => {
+        await updatesByIds(userArr).then(res => {
+          let data=res.data;
           console.log('请求成功了')
           console.log(data)
           if (data.code === '000000') {//请求成功
@@ -311,9 +399,9 @@ export default {
           } else {
             alert(data.msg)
           }
-        }, error => {
+        }, res => {
           //请求后更新List的数据
-          alert(error.message)
+          alert(res.data.message)
         });
       }
     },
@@ -327,7 +415,8 @@ export default {
         //调用修改接口来修改当前记录的字段值
         //加工要转入后端的参数
 
-        await deletesByIds({ids:data.id}).then(data => {
+        await deletesByIds({ids:data.id}).then(res => {
+          let data=res.data;
           console.log('请求成功了')
           console.log(data)
           if (data.code === '000000') {//请求成功
@@ -340,9 +429,9 @@ export default {
           } else {
             alert(data.msg)
           }
-        }, error => {
+        }, res => {
           //请求后更新List的数据
-          alert(error.message)
+          alert(res.data.message)
         });
       }).catch(() => {
         this.$message({
@@ -375,7 +464,8 @@ export default {
           ids+=row.id+','
         });
         ids=ids.substr(0,ids.length-1);
-        await deletesByIds({ids:ids}).then(data => {
+        await deletesByIds({ids:ids}).then(res => {
+          let data=res.data;
           console.log('请求成功了')
           console.log(data)
           if (data.code === '000000') {//请求成功
@@ -388,9 +478,9 @@ export default {
           } else {
             alert(data.msg)
           }
-        }, error => {
+        }, res => {
           //请求后更新List的数据
-          alert(error.message)
+          alert(res.data.message)
         });
       }).catch(() => {
         this.$message({
@@ -398,7 +488,103 @@ export default {
           message: '已取消删除'
         });
       });
-    }
+    },
+
+    /** 导入按钮操作 */
+    handleImport() {
+      this.upload.title = "用户导入";
+      this.upload.open = true;
+    },
+    // 文件上传中处理
+    handleFileUploadProgress(event, file, fileList) {
+      this.upload.isUploading = true;
+    },
+    handleFileSuccess(res, file, fileList) {
+      this.upload.open = false;
+      this.upload.isUploading = false;
+      this.$refs.upload.clearFiles();
+      let data=res.data;
+      console.log(data);
+      if(data.code=='000000'){//导入成功
+        this.$message({
+          message: data.msg,
+          type: 'success'
+        });
+        //刷新列表
+        this.loadData();
+      }else{//导入失败
+        console.log(data);
+        var arr = [];
+        console.log(data.unqualifiedRows);
+        for(var j = 0;j<data.unqualifiedRows.length; j++){
+          let item=data.unqualifiedRows[j];
+          let record=new Object();
+          record.id=nanoid();
+          record.errorRow='记录'+item.rowOrder;
+          record.errorMsgs='';
+          let children=[];
+
+          console.log(item);
+
+          for(var i=0;i<item.rowMsgs.length;i++){
+            var item2=item.rowMsgs[i];
+            let child=new Object();
+            child.id=nanoid();
+            child.errorRow=item2.msgName;
+            child.errorMsgs='';
+            for (var i1=0;i1<item2.unqualifiedMsg.length;i1++){
+              child.errorMsgs+='['+item2.unqualifiedMsg[i1]+']';
+            }
+            children.push(child);
+          }
+          record.children=children;
+          arr.push(record);
+        }
+        this.excelErrorTableData=arr;
+        this.dialogTableVisible=true;
+      }
+      // this.$alert("<div style='overflow: auto;overflow-x: hidden;max-height: 70vh;padding: 10px 20px 0;'>" + res.data.msg + "</div>", "导入结果", { dangerouslyUseHTMLString: true });
+      // this.getList();
+    },
+    // 提交上传文件
+    submitFileForm() {
+      this.$refs.upload.submit();
+    },
+
+    /** 导出按钮操作 */
+    handleExport() {
+      const data = {
+        // current: this.currentPage,
+        // size: this.pageSize,
+        name: this.formInline.name==""?null:this.formInline.name,
+        gender: this.formInline.gender
+      };
+      excelExport(data).then(res => {//这两个data不是同一个对象,只是名字一样
+        let data=res.data;
+        let blob = new Blob([data],{type: 'application/octet-stream'});
+        let fileName = 'filename.xls';
+        // 如果后端返回文件名
+        let contentDisposition = res.headers['content-disposition'];
+        fileName = decodeURI(contentDisposition.split('=')[1]);
+        fileName=fileName.substring(7);//UTF-8''...
+        if ('download' in document.createElement('a')) {  // 非IE下载
+          let link = document.createElement('a');
+          link.download = fileName;
+          link.style.display = 'none';
+          link.href = URL.createObjectURL(blob);
+          document.body.appendChild(link);
+          link.click();
+          URL.revokeObjectURL(link.href) ; // 释放URL 对象
+          document.body.removeChild(link);
+        } else {  // IE10+下载
+          navigator.msSaveBlob(blob,fileName);
+        }
+      }, error => {
+        //请求后更新List的数据
+        alert(error.message)
+      });
+    },
+
   }
 }
 </script>
